@@ -70,7 +70,7 @@ contract PredictionMarket is Ownable {
      * TODO: Allow for more
      *
      **/
-    enum MarketState {OPEN, PENDING_RESOLUTION, RESOLVED, CLOSED}
+    enum MarketState {CLOSED, OPEN, PENDING_RESOLUTION, RESOLVED}
 
     struct Market {
         // Resolver addr
@@ -342,7 +342,9 @@ contract PredictionMarket is Ownable {
             ,
             uint256 _totalStakedOpt1,
             uint256 _totalStakedOpt2,
-            uint256 _totalStakedOpt3
+            uint256 _totalStakedOpt3,
+            ,
+            ,
         ) = getMarket(_marketId);
         uint256 totalStaked = _totalStakedOpt1 +
             _totalStakedOpt2 +
@@ -384,7 +386,10 @@ contract PredictionMarket is Ownable {
             address _aggregatorAddress,
             uint256 _totalStakedOpt1,
             uint256 _totalStakedOpt2,
-            uint256 _totalStakedOpt3
+            uint256 _totalStakedOpt3,
+            uint256 _opensAt,
+            uint256 _closesAt,
+            uint256 _forecastTime
         )
     {
         Market memory _market = markets[_marketId];
@@ -392,6 +397,14 @@ contract PredictionMarket is Ownable {
         _totalStakedOpt1 = _market.totalStakedOpt1;
         _totalStakedOpt2 = _market.totalStakedOpt2;
         _totalStakedOpt3 = _market.totalStakedOpt3;
+        _opensAt = _market.opensAt;
+        _closesAt = _market.closesAt;
+        _forecastTime = _market.forecastTime;
+    }
+    
+    function getOptionInfo(uint256 _marketId, uint256 _optionNo) public view returns(int256, int256) {
+        OptionRange memory _optionRange = optionInfoForMarket[_marketId][_optionNo];
+        return (_optionRange.startPrice, _optionRange.endPrice);
     }
 }
 
