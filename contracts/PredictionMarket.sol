@@ -73,6 +73,8 @@ contract PredictionMarket is Ownable {
     enum MarketState {CLOSED, OPEN, PENDING_RESOLUTION, RESOLVED}
 
     struct Market {
+        bytes32 fromToken;
+        bytes32 toToken;
         // Resolver addr
         address aggregatorAddress;
         // Stake
@@ -132,6 +134,20 @@ contract PredictionMarket is Ownable {
     /**
      * -------------------------------------
      * -------------------------------------
+     *              EVENTS
+     * -------------------------------------
+     **/
+    event MarketCreated(uint256 indexed _marketId);
+    event UserStaked(
+        address indexed _user,
+        uint256 indexed _marketId,
+        uint256 indexed _optionNo,
+        uint256 _amount
+    );
+
+    /**
+     * -------------------------------------
+     * -------------------------------------
      *              MODIFIERS
      * -------------------------------------
      **/
@@ -184,6 +200,8 @@ contract PredictionMarket is Ownable {
 
     function addMarket(
         IAggregator _aggregatorAddress,
+        bytes32 _fromToken,
+        bytes32 _toToken,
         uint256 _opensAt,
         uint256 _closesAt,
         uint256 _forecastAt
@@ -191,6 +209,8 @@ contract PredictionMarket is Ownable {
         _marketId = marketId++;
         markets[_marketId] = Market({
             aggregatorAddress: address(_aggregatorAddress),
+            fromToken: _fromToken,
+            toToken: _toToken,
             optionsConfigured: false,
             totalStakedOpt1: 0,
             totalStakedOpt2: 0,
@@ -200,6 +220,8 @@ contract PredictionMarket is Ownable {
             forecastTime: _forecastAt,
             state: MarketState.CLOSED
         });
+
+        emit MarketCreated(_marketId);
     }
 
     function configureOptionRanges(
@@ -231,6 +253,16 @@ contract PredictionMarket is Ownable {
             optionNo: uint8(_optionNo),
             amt: msg.value
         });
+
+        if (_optionNo == 1) {
+            markets[_marketId].totalStakedOpt1 += msg.value;
+        } else if (_optionNo == 2) {
+            markets[_marketId].totalStakedOpt2 += msg.value;
+        } else if (_optionNo == 3) {
+            markets[_marketId].totalStakedOpt3 += msg.value;
+        }
+
+        emit UserStaked(msg.sender, _marketId, _optionNo, msg.value);
     }
 
     function resolve(uint256 _marketId, uint256 _roundId)
@@ -345,6 +377,7 @@ contract PredictionMarket is Ownable {
             uint256 _totalStakedOpt3,
             ,
             ,
+
         ) = getMarket(_marketId);
         uint256 totalStaked = _totalStakedOpt1 +
             _totalStakedOpt2 +
@@ -401,9 +434,25 @@ contract PredictionMarket is Ownable {
         _closesAt = _market.closesAt;
         _forecastTime = _market.forecastTime;
     }
-    
-    function getOptionInfo(uint256 _marketId, uint256 _optionNo) public view returns(int256, int256) {
-        OptionRange memory _optionRange = optionInfoForMarket[_marketId][_optionNo];
+
+    function getMarketPairs(uint256 _marketId)
+        public
+        view
+        returns (bytes32 _fromToken, bytes32 _toToken)
+    {
+        Market memory _market = markets[_marketId];
+        _fromToken = _market.fromToken;
+        _toToken = _market.toToken;
+    }
+
+    function getOptionInfo(uint256 _marketId, uint256 _optionNo)
+        public
+        view
+        returns (int256, int256)
+    {
+
+            OptionRange memory _optionRange
+         = optionInfoForMarket[_marketId][_optionNo];
         return (_optionRange.startPrice, _optionRange.endPrice);
     }
 }
