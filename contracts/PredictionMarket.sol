@@ -329,6 +329,10 @@ contract PredictionMarket is Ownable {
         delete userStakeInfoForAMkt[_marketId][msg.sender];
         msg.sender.transfer(winAmt);
     }
+    
+    function withdraw() public onlyOwner {
+        msg.sender.transfer(address(this).balance);
+    }
 
     /**
      * -------------------------------------
@@ -344,6 +348,10 @@ contract PredictionMarket is Ownable {
     {
         Market memory _market = markets[_marketId];
         _state = _market.state;
+        
+        if(_market.state == MarketState.RESOLVED) {
+            return _market.state;
+        }
 
         // Check/Reflect correct state based on time
         // Options not yet configured;
