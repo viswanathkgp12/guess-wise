@@ -1,0 +1,1 @@
+export const predictionMarketContract = '0x113af60fa725956E42C33De47e2124ba75D0549f'
