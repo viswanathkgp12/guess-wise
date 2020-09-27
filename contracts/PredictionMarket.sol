@@ -128,7 +128,6 @@ contract PredictionMarket is Ownable {
     mapping(uint256 => mapping(address => Stake)) userStakeInfoForAMkt;
 
     // Update winning option for market on resolution
-    // TODO: Should this be inside struct?!
     mapping(uint256 => uint256) winningOptForMkt;
 
     /**
@@ -198,6 +197,18 @@ contract PredictionMarket is Ownable {
      * -------------------------------------
      **/
 
+    /**
+     * Add a new Market
+     * 
+     * @param _aggregatorAddress - Chainlink Aggregator address
+     *                             For e.g., BTC/USDT
+     * @param _fromToken         -
+     * @param _toToken           -
+     * @param _opensAt           - Market opening time
+     * @param _closesAt          - Bids close at
+     *                             Ideally 30-45 min gap to forecast time
+     * @param _forecastAt        - Forecast time
+     **/
     function addMarket(
         IAggregator _aggregatorAddress,
         bytes32 _fromToken,
@@ -223,7 +234,17 @@ contract PredictionMarket is Ownable {
 
         emit MarketCreated(_marketId);
     }
-
+    
+    /**
+     * Configure options for the new Market
+     * 
+     * Options are fixed at 3 right now.
+     * Each option has a range startPrice and endPrice
+     * 
+     * @param _marketId    - MarketID concerned
+     * @param _startPrices - Option starting ranges
+     * @param _endPrices   - Option end ranges
+     **/
     function configureOptionRanges(
         uint256 _marketId,
         int256[3] memory _startPrices,
@@ -242,6 +263,12 @@ contract PredictionMarket is Ownable {
         markets[_marketId].optionsConfigured = true;
     }
 
+    /**
+     * Stake on a marketID against a given option
+     * 
+     * @param _marketId -
+     * @param _optionNo - 
+     **/
     function stake(uint256 _marketId, uint256 _optionNo)
         public
         payable
@@ -265,6 +292,22 @@ contract PredictionMarket is Ownable {
         emit UserStaked(msg.sender, _marketId, _optionNo, msg.value);
     }
 
+    /**
+     * Resolve a market specifying the roundID of the aggregatorAddress
+     * 
+     * Contract will look up the timestamp of the roundID as a sanity check.
+     * If it falls within a range of 3 min from the forecastTime,
+     * the answer corr. to latest round ID is accepted.
+     * 
+     * @notice - 3 mins cuz in case of high gas price conditions,
+     *         chainlink oracle updates to Aggregator might be slower
+     * 
+     * Beyond 3 minutes, the market is discarded
+     * 
+     * @param _marketId - 
+     * @param _roundId  - RoundID of the Aggregator at which
+     *                    the answer to the price forecast might be found
+     **/
     function resolve(uint256 _marketId, uint256 _roundId)
         public
         marketToBeResolved(_marketId)
@@ -323,13 +366,28 @@ contract PredictionMarket is Ownable {
         markets[_marketId].state = MarketState.RESOLVED;
     }
 
+    /**
+     * Claim winnings if any 
+     * 
+     * @param _marketId - 
+     **/
     function claimWinnings(uint256 _marketId) public {
         uint256 winAmt = getUserWinnings(_marketId, msg.sender);
 
         delete userStakeInfoForAMkt[_marketId][msg.sender];
-        msg.sender.transfer(winAmt);
+        
+        if(winAmt > 0) {
+            msg.sender.transfer(winAmt);
+        }
     }
     
+    /**
+     * @dev This fn. is only needed to handle special cases
+     * 
+     * For e.g., in a market when every bidder chooses the wrong option,
+     *           ETH is basically stuck in the Contract
+     *           As of now, devs can claim this
+     **/
     function withdraw() public onlyOwner {
         msg.sender.transfer(address(this).balance);
     }
@@ -371,11 +429,20 @@ contract PredictionMarket is Ownable {
         }
     }
 
+    /**
+     * Get possible winnings of an user
+     **/
     function getUserWinnings(uint256 _marketId, address _user)
         public
         view
         returns (uint256 _userShare)
     {
+        Market memory _market = markets[_marketId];
+
+        if(_market.state != MarketState.RESOLVED) {
+            revert("Market not yet resolved");
+        }
+        
         uint256 winningOpt = winningOptForMkt[_marketId];
 
         (
@@ -410,6 +477,9 @@ contract PredictionMarket is Ownable {
         }
     }
 
+    /**
+     * Get user stake details
+     **/
     function getUserStake(uint256 _marketId, address _user)
         public
         view
@@ -420,6 +490,9 @@ contract PredictionMarket is Ownable {
         _amt = _stake.amt;
     }
 
+    /**
+     * Get market details
+     **/
     function getMarket(uint256 _marketId)
         public
         view
@@ -443,6 +516,9 @@ contract PredictionMarket is Ownable {
         _forecastTime = _market.forecastTime;
     }
 
+    /**
+     * Get market pair details
+     **/
     function getMarketPairs(uint256 _marketId)
         public
         view
@@ -453,6 +529,9 @@ contract PredictionMarket is Ownable {
         _toToken = _market.toToken;
     }
 
+    /**
+     * Get option ranges for a given market
+     **/
     function getOptionInfo(uint256 _marketId, uint256 _optionNo)
         public
         view
